@@ -112,19 +112,19 @@ def parse_toml(config):
             failing_option="all_bullets",
         )
 
-    template = config.get("template", _template_fname)
-    if template.startswith("towncrier:"):
-        resource_name = "templates/" + template.split(
-            "towncrier:", 1)[1] + ".rst"
-        if not pkg_resources.resource_exists("towncrier", resource_name):
-            raise KeyError(
-                "Towncrier does not have a template named '%s'."
-                % (template.split("towncrier:", 1)[1],)
-            )
-
-        template = pkg_resources.resource_filename("towncrier", resource_name)
-    else:
-        template = template
+    # template = config.get("template", _template_fname)
+    # if template.startswith("towncrier:"):
+    #     resource_name = "templates/" + template.split(
+    #         "towncrier:", 1)[1] + ".rst"
+    #     if not pkg_resources.resource_exists("towncrier", resource_name):
+    #         raise KeyError(
+    #             "Towncrier does not have a template named '%s'."
+    #             % (template.split("towncrier:", 1)[1],)
+    #         )
+    #
+    #     template = pkg_resources.resource_filename("towncrier", resource_name)
+    # else:
+    #     template = template
 
     return {
         "package": config.get("package", ""),
@@ -136,7 +136,7 @@ def parse_toml(config):
         "name": config.get("name"),
         "sections": sections,
         "types": types,
-        "template": template,
+        # "template": template,
         "start_string": config.get("start_string", _start_string),
         "title_format": config.get("title_format", _title_format),
         "issue_format": config.get("issue_format"),
