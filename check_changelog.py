@@ -38,6 +38,7 @@ except KeyError:
     sys.exit(1)
 
 if not cl_config.get('enabled', False):
+    print(f"cl_config = {cl_config}")
     print('Skipping towncrier changelog plugin as disabled in config')
     sys.exit(0)
 
