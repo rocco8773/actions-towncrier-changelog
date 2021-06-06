@@ -161,6 +161,7 @@ def validate_cl_candidates(filenames: List[str], pr_num, types) -> bool:
             continue
 
         parts = parse_newfragment_basename(filename, types)
+        print(f"{filename} and {parts}")
 
         if parts == (None, None, None) or parts[0] != pr_num:
             valid = False
@@ -240,6 +241,11 @@ def run():
     pr_modified_files = [f.filename for f in pr.get_files()]
 
     cl_condidates = collect_possible_changelog_files(pr_modified_files, config)
+    print(
+        f"candidates = {cl_condidates}\n"
+        f"PR num = {pr_num}\n"
+        f"types = {list(config['types'])}"
+    )
     valid = validate_cl_candidates(
         cl_condidates, pr_num=pr_num, types=list(config["types"])
     )
