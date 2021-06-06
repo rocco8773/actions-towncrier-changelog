@@ -29,7 +29,7 @@ def parse_toml(config) -> Dict[str, Any]:
         raise KeyError("No [tool.towncrier] section found in the pyproject.toml")
 
     sections = OrderedDict()
-    types = OrderedDict(**_default_types)
+    types = OrderedDict()
 
     if "section" in config:
         for x in config["section"]:
@@ -43,6 +43,8 @@ def parse_toml(config) -> Dict[str, Any]:
                 "name": x["name"],
                 "showcontent": x["showcontent"],
             }
+    else:
+        types = _default_types
 
     return {
         "package": config.get("package", ""),
