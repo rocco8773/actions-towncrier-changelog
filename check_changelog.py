@@ -2,11 +2,12 @@ import json
 import os
 import re
 import sys
+import toml
+
 from collections import OrderedDict
+from github import Github
 from pathlib import Path
 
-from github import Github
-from toml import loads
 
 
 _start_string = u".. towncrier release notes start\n"
@@ -129,27 +130,31 @@ def check_changelog_type(types, matching_file):
 
 
 def run():
+    """Function to run when action is run."""
     event_name = os.environ['GITHUB_EVENT_NAME']
     if not event_name.startswith('pull_request'):
         print(f'No-op for {event_name}')
         sys.exit(0)
 
-    event_jsonfile = os.environ['GITHUB_EVENT_PATH']
+    g = Github(os.environ.get('GITHUB_TOKEN'))
 
+    # get webhook paylod for the GitHub event
+    event_jsonfile = os.environ['GITHUB_EVENT_PATH']
     with open(event_jsonfile, encoding='utf-8') as fin:
         event = json.load(fin)
 
     bot_username = os.environ.get('BOT_USERNAME', 'astropy-bot')
-    basereponame = event['pull_request']['base']['repo']['full_name']
-    g = Github(os.environ.get('GITHUB_TOKEN'))
+    base_repo_name = event['pull_request']['base']['repo']['full_name']
 
     # Grab config from upstream's default branch
-    print(f'Bot username: {bot_username}')
-    print(f'Base repository: {basereponame}')
-    print()
-    baserepo = g.get_repo(basereponame)
-    pyproject_toml = baserepo.get_contents('pyproject.toml')
-    toml_cfg = loads(pyproject_toml.decoded_content.decode('utf-8'))
+    print(
+        f"Bot username: {bot_username}\n"
+        f"Base repository: {base_repo_name}\n\n"
+    )
+    base_repo = g.get_repo(base_repo_name)
+    toml_cfg = toml.loads(
+        base_repo.get_contents('pyproject.toml').decoded_content.decode('utf-8')
+    )
 
     try:
         cl_config = toml_cfg['tool'][bot_username]['towncrier_changelog']
@@ -162,12 +167,10 @@ def run():
         print('Skipping towncrier changelog plugin as disabled in config')
         sys.exit(0)
 
-    skip_label = cl_config.get('changelog_skip_label', None)
     pr_labels = [e['name'] for e in event['pull_request']['labels']]
+    print(f'PR labels: {pr_labels}\n\n')
 
-    print(f'PR labels: {pr_labels}')
-    print()
-
+    skip_label = cl_config.get('changelog_skip_label', None)
     if skip_label and skip_label in pr_labels:
         print(f'Skipping towncrier changelog plugin because "{skip_label}" '
               'label is set')
@@ -175,11 +178,14 @@ def run():
 
     config = parse_toml(toml_cfg)
     pr_num = event['number']
-    pr = baserepo.get_pull(pr_num)
-    modified_files = [f.filename for f in pr.get_files()]
+    pr = base_repo.get_pull(pr_num)
+    pr_modified_files = [f.filename for f in pr.get_files()]
+
+    print(f"PR Files include {pr_modified_files}")
+
     section_dirs = calculate_fragment_paths(config)
     types = config['types'].keys()
-    matching_file = check_sections(modified_files, section_dirs)
+    matching_file = check_sections(pr_modified_files, section_dirs)
 
     if not matching_file:
         print('No changelog file was added in the correct directories for '
