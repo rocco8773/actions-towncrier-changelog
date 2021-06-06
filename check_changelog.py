@@ -172,7 +172,7 @@ def validate_cl_candidates(filenames: List[str], pr_num, types) -> bool:
 
     if not valid:
         print(
-            f"Some files were not valid.  Look to the pyproject.toml for proper"
+            f"\nSome files were not valid.  Look to the pyproject.toml for proper"
             f"change log sub-directories and types.  Sections labeled as"
             f" [tool.towncrier.section] indicate valid sub-directory names "
             f"and [tool.towncrier.type] indicate valid change log types."
