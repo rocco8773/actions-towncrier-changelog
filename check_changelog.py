@@ -106,7 +106,7 @@ def collect_possible_changelog_files(
     """
     possible_cl_files = []
 
-    section_dirs = list(config["section"].values())
+    section_dirs = list(config["sections"].values())
 
     if config["directory"] is not None:
         cl_base_dir = config["directory"]
