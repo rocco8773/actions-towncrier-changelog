@@ -5,7 +5,7 @@ import toml
 
 from collections import OrderedDict
 from github import Github
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 _template_fname = "towncrier:default"
 _default_types = OrderedDict([
@@ -97,7 +97,7 @@ def collect_possible_changelog_files(
 
 def validate_cl_candidates(filenames: List[str], pr_num, types) -> bool:
 
-    def strip_if_integer_string(s):
+    def strip_if_integer_string(s) -> Union[str, int]:
         try:
             i = int(s)
         except ValueError:
@@ -109,14 +109,16 @@ def validate_cl_candidates(filenames: List[str], pr_num, types) -> bool:
     #
     # Returns ticket, category and counter or (None, None, None) if the basename
     # could not be parsed or doesn't contain a valid category.
-    def parse_newfragment_basename(basename, definitions):
+    def parse_newfragment_basename(
+        basename: str, definitions: List[str]
+    ) -> Tuple[Optional[str, int], Optional[str], Optional[int]]:
         invalid = (None, None, None)
-        parts = basename.split(".")
+        _parts = basename.split(".")
 
-        if len(parts) == 1:
+        if len(_parts) == 1:
             return invalid
-        if len(parts) == 2:
-            ticket, category = parts
+        if len(_parts) == 2:
+            ticket, category = _parts
             ticket = strip_if_integer_string(ticket)
             return (ticket, category, 0) if category in definitions else invalid
 
@@ -124,20 +126,20 @@ def validate_cl_candidates(filenames: List[str], pr_num, types) -> bool:
         # part onwards.
         # The category is used as the reference point in the parts list to later
         # infer the issue number and counter value.
-        for i in range(1, len(parts)):
-            if parts[i] in definitions:
+        for i in range(1, len(_parts)):
+            if _parts[i] in definitions:
                 # Current part is a valid category according to given definitions.
-                category = parts[i]
+                category = _parts[i]
                 # Use the previous part as the ticket number.
                 # NOTE: This allows news fragment names like fix-1.2.3.feature or
                 # something-cool.feature.ext for projects that don't use ticket
                 # numbers in news fragment names.
-                ticket = strip_if_integer_string(parts[i - 1])
+                ticket = strip_if_integer_string(_parts[i - 1])
                 counter = 0
                 # Use the following part as the counter if it exists and is a valid
                 # digit.
-                if len(parts) > (i + 1) and parts[i + 1].isdigit():
-                    counter = int(parts[i + 1])
+                if len(_parts) > (i + 1) and _parts[i + 1].isdigit():
+                    counter = int(_parts[i + 1])
                 return ticket, category, counter
         else:
             # No valid category found.
@@ -163,7 +165,7 @@ def validate_cl_candidates(filenames: List[str], pr_num, types) -> bool:
         parts = parse_newfragment_basename(filename, types)
         print(f"{filename} and {parts}")
 
-        if parts == (None, None, None) or parts[0] != pr_num:
+        if parts == (None, None, None) or int(parts[0]) != pr_num:
             valid = False
             print(
                 f"{filename}  -  INVALID  -  File name either has wrong PR number"
