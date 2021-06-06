@@ -9,9 +9,6 @@ from github import Github
 from pathlib import Path
 
 
-
-_start_string = u".. towncrier release notes start\n"
-_title_format = None
 _template_fname = "towncrier:default"
 _default_types = OrderedDict([
     (u"feature", {"name": u"Features", "showcontent": True}),
@@ -19,19 +16,22 @@ _default_types = OrderedDict([
     (u"doc", {"name": u"Improved Documentation", "showcontent": True}),
     (u"removal", {"name": u"Deprecations and Removals", "showcontent": True}),
     (u"misc", {"name": u"Misc", "showcontent": False})])
-_underlines = ["=", "-", "~"]
 
 
 # This was from towncrier._settings before they changed the API to be too
 # painful.
 def parse_toml(config):
-    if "tool" not in config:
-        raise KeyError("No [tool.towncrier] section.", failing_option="all")
-
-    config = config["tool"]["towncrier"]
+    """
+    Examine the pyproject.toml and extract the necessary configuration values
+    for checking for change log entries.
+    """
+    try:
+        config = config["tool"]["towncrier"]
+    except KeyError:
+        raise KeyError("No [tool.towncrier] section found in the pyproject.toml")
 
     sections = OrderedDict()
-    types = OrderedDict()
+    types = OrderedDict(**_default_types)
 
     if "section" in config:
         for x in config["section"]:
@@ -41,50 +41,17 @@ def parse_toml(config):
 
     if "type" in config:
         for x in config["type"]:
-            types[x["directory"]] = {"name": x["name"],
-                                     "showcontent": x["showcontent"]}
-    else:
-        types = _default_types
-
-    wrap = config.get("wrap", False)
-
-    single_file_wrong = config.get("singlefile")
-    if single_file_wrong:
-        raise KeyError(
-            "`singlefile` is not a valid option. Did you mean `single_file`?",
-            failing_option="singlefile",
-        )
-
-    single_file = config.get("single_file", True)
-    if not isinstance(single_file, bool):
-        raise KeyError(
-            "`single_file` option must be a boolean: false or true.",
-            failing_option="single_file",
-        )
-
-    all_bullets = config.get("all_bullets", True)
-    if not isinstance(all_bullets, bool):
-        raise KeyError(
-            "`all_bullets` option must be boolean: false or true.",
-            failing_option="all_bullets",
-        )
+            types[x["directory"]] = {
+                "name": x["name"],
+                "showcontent": x["showcontent"],
+            }
 
     return {
         "package": config.get("package", ""),
         "package_dir": config.get("package_dir", "."),
-        "single_file": single_file,
-        "filename": config.get("filename", "NEWS.rst"),
         "directory": config.get("directory"),
-        "version": config.get("version"),
-        "name": config.get("name"),
         "sections": sections,
         "types": types,
-        "start_string": config.get("start_string", _start_string),
-        "title_format": config.get("title_format", _title_format),
-        "issue_format": config.get("issue_format"),
-        "underlines": config.get("underlines", _underlines),
-        "wrap": wrap,
-        "all_bullets": all_bullets,
     }
 
 
