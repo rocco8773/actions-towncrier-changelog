@@ -111,7 +111,7 @@ def validate_cl_candidates(filenames: List[str], pr_num, types) -> bool:
     # could not be parsed or doesn't contain a valid category.
     def parse_newfragment_basename(
         basename: str, definitions: List[str]
-    ) -> Tuple[Optional[str, int], Optional[str], Optional[int]]:
+    ) -> Tuple[Union[str, int, None], Optional[str], Optional[int]]:
         invalid = (None, None, None)
         _parts = basename.split(".")
 
