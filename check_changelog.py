@@ -55,6 +55,29 @@ def parse_toml(config) -> Dict[str, Any]:
     }
 
 
+def changelog_base_dir(config: Dict[str, Any]) -> str:
+    if config["directory"] is not None:
+        cl_base_dir = config["directory"]
+    else:
+        # fallback to towncrier default
+        cl_base_dir = os.path.join(
+            config['package_dir'], config['package'], "newsfragments"
+        )
+    return cl_base_dir
+
+
+def valid_changelog_dirs(config: Dict[str, Any]) -> List[str]:
+    section_dirs = list(config["sections"].values())
+
+    cl_base_dir = changelog_base_dir(config)
+
+    valid_dirs = [cl_base_dir]
+    for sdir in section_dirs:
+        valid_dirs.append(os.path.join(cl_base_dir, sdir))
+
+    return valid_dirs
+
+
 def collect_possible_changelog_files(
     pr_files: List[str], config: Dict[str, Any]
 ) -> List[str]:
@@ -65,31 +88,44 @@ def collect_possible_changelog_files(
     """
     possible_cl_files = []
 
-    section_dirs = list(config["sections"].values())
+    cl_base_dir = changelog_base_dir(config)
+    valid_dirs = valid_changelog_dirs(config)
 
-    if config["directory"] is not None:
-        cl_base_dir = config["directory"]
-    else:
-        # fallback to towncrier default
-        cl_base_dir = os.path.join(
-            config['package_dir'], config['package'], "newsfragments"
-        )
+    # section_dirs = list(config["sections"].values())
+    #
+    # if config["directory"] is not None:
+    #     cl_base_dir = config["directory"]
+    # else:
+    #     # fallback to towncrier default
+    #     cl_base_dir = os.path.join(
+    #         config['package_dir'], config['package'], "newsfragments"
+    #     )
 
     for filename in pr_files:
         if not filename.endswith(".rst"):
             continue
 
-        if not filename.startswith(cl_base_dir):
-            continue
+        # if not filename.startswith(cl_base_dir):
+        #     continue
+        #
+        # filename = filename.lstrip(cl_base_dir).lstrip("/")
+        #
+        # for sdir in section_dirs:
+        #     if filename.startswith(sdir):
+        #         filename.lstrip(sdir).lstrip("/")
+        #         continue
+        #
+        # if filename != "":
+        #     possible_cl_files.append(filename)
 
-        filename = filename.lstrip(cl_base_dir).lstrip("/")
-
-        for sdir in section_dirs:
-            if filename.startswith(sdir):
-                filename.lstrip(sdir).lstrip("/")
+        for vdir in valid_dirs:
+            if os.path.dirname(filename) == vdir:
+                filename = os.path.basename(filename)
+                possible_cl_files.append(filename)
                 continue
 
-        if filename != "":
+        if os.path.dirname(filename) != "" and filename.startswith(cl_base_dir):
+            filename = filename.lstrip(cl_base_dir).lstrip("/")
             possible_cl_files.append(filename)
 
     return possible_cl_files
@@ -229,7 +265,6 @@ def run():
         sys.exit(0)
 
     pr_labels = [e['name'] for e in event['pull_request']['labels']]
-    print(f'PR labels: {pr_labels}\n')
 
     skip_label = cl_config.get('changelog_skip_label', None)
     if skip_label and skip_label in pr_labels:
@@ -244,10 +279,12 @@ def run():
 
     cl_condidates = collect_possible_changelog_files(pr_modified_files, config)
     print(
-        f"candidates = {cl_condidates}\n"
         f"PR num = {pr_num}\n"
-        f"types = {list(config['types'])}"
+        f"PR labels: {pr_labels}\n"
+        f"valid types = {list(config['types'])}\n"
+        f"valid dirs = {valid_changelog_dirs(config)}\n"
     )
+
     valid = validate_cl_candidates(
         cl_condidates, pr_num=pr_num, types=list(config["types"])
     )
