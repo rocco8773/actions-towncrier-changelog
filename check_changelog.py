@@ -1,12 +1,10 @@
 import json
 import os
-import re
 import sys
 import toml
 
 from collections import OrderedDict
 from github import Github
-from pathlib import Path
 from typing import Any, Dict, List
 
 _template_fname = "towncrier:default"
@@ -53,47 +51,6 @@ def parse_toml(config) -> Dict[str, Any]:
         "sections": sections,
         "types": types,
     }
-
-
-def calculate_fragment_paths(config):
-    if config.get("directory") is not None:
-        base_directory = config["directory"]
-        fragment_directory = None
-    else:
-        base_directory = os.path.join(config['package_dir'], config['package'])
-        fragment_directory = "newsfragments"
-
-    section_dirs = []
-    for key, val in config['sections'].items():
-        if fragment_directory is not None:
-            section_dirs.append(os.path.join(base_directory, val,
-                                             fragment_directory))
-        else:
-            section_dirs.append(os.path.join(base_directory, val))
-
-    return section_dirs
-
-
-def check_sections(filenames, sections):
-    """Check that a file matches ``<section><issue number>``.
-    Otherwise the root dir matches when it shouldn't.
-    """
-    for section in sections:
-        # Make sure the path ends with a /
-        if not section.endswith("/"):
-            section += "/"
-        pattern = section.replace("/", r"\/") + r"\d+.*"
-        for fname in filenames:
-            match = re.match(pattern, fname)
-            if match is not None:
-                return fname
-    return False
-
-
-def check_changelog_type(types, matching_file):
-    filename = Path(matching_file).name
-    components = filename.split(".")
-    return components[1] in types
 
 
 def collect_possible_changelog_files(
