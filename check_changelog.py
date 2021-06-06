@@ -136,6 +136,87 @@ def collect_possible_changelog_files(
     return possible_cl_files
 
 
+def validate_cl_candidates(filenames: List[str], pr_num, types) -> bool:
+
+    def strip_if_integer_string(s):
+        try:
+            i = int(s)
+        except ValueError:
+            return s
+
+        return str(i)
+
+    # copied directly from towncrier/_builder.py in v21.3.1
+    #
+    # Returns ticket, category and counter or (None, None, None) if the basename
+    # could not be parsed or doesn't contain a valid category.
+    def parse_newfragment_basename(basename, definitions):
+        invalid = (None, None, None)
+        parts = basename.split(".")
+
+        if len(parts) == 1:
+            return invalid
+        if len(parts) == 2:
+            ticket, category = parts
+            ticket = strip_if_integer_string(ticket)
+            return (ticket, category, 0) if category in definitions else invalid
+
+        # There are at least 3 parts. Search for a valid category from the second
+        # part onwards.
+        # The category is used as the reference point in the parts list to later
+        # infer the issue number and counter value.
+        for i in range(1, len(parts)):
+            if parts[i] in definitions:
+                # Current part is a valid category according to given definitions.
+                category = parts[i]
+                # Use the previous part as the ticket number.
+                # NOTE: This allows news fragment names like fix-1.2.3.feature or
+                # something-cool.feature.ext for projects that don't use ticket
+                # numbers in news fragment names.
+                ticket = strip_if_integer_string(parts[i - 1])
+                counter = 0
+                # Use the following part as the counter if it exists and is a valid
+                # digit.
+                if len(parts) > (i + 1) and parts[i + 1].isdigit():
+                    counter = int(parts[i + 1])
+                return ticket, category, counter
+        else:
+            # No valid category found.
+            return invalid
+
+    valid = True
+    for filename in filenames:
+        if os.path.dirname(filename) != "":
+            valid = False
+            print(
+                f"{filename}  -  INVALID  -  File defined in an unrecognized"
+                f" sub-directory"
+            )
+            continue
+
+        parts = parse_newfragment_basename(filename, types)
+
+        if parts == (None, None, None) or parts[0] != pr_num:
+            valid = False
+            print(
+                f"{filename}  -  INVALID  -  File name either has wrong PR number"
+                f" or change log type"
+            )
+            continue
+
+        print(f"{filename}  -  VALID")
+
+    if not valid:
+        print(
+            f"Some files were not valid.  Look to the pyproject.toml for proper"
+            f"change log sub-directories and types.  Sections labeled as"
+            f" [tool.towncrier.section] indicate valid sub-directory names "
+            f"and [tool.towncrier.type] indicate valid change log types."
+        )
+
+    return valid
+
+
 def run():
     """Function to run when action is run."""
     event_name = os.environ['GITHUB_EVENT_NAME']
@@ -175,7 +256,7 @@ def run():
         sys.exit(0)
 
     pr_labels = [e['name'] for e in event['pull_request']['labels']]
-    print(f'PR labels: {pr_labels}\n\n')
+    print(f'PR labels: {pr_labels}\n')
 
     skip_label = cl_config.get('changelog_skip_label', None)
     if skip_label and skip_label in pr_labels:
@@ -187,35 +268,27 @@ def run():
     pr_num = event['number']
     pr = base_repo.get_pull(pr_num)
     pr_modified_files = [f.filename for f in pr.get_files()]
+
+    print(f"PR Files include {pr_modified_files}\n\n")
+
     cl_condidates = collect_possible_changelog_files(pr_modified_files, config)
-
-    print(
-        f"PR Files include {pr_modified_files}\n\n"
-        f"Number of Possible Change Log Files = {len(cl_condidates)}")
-
-    section_dirs = calculate_fragment_paths(config)
-    types = config['types'].keys()
-    matching_file = check_sections(pr_modified_files, section_dirs)
-
-    if not matching_file:
-        print('No changelog file was added in the correct directories for '
-              f'PR {pr_num}')
+    if len(cl_condidates) == 0:
+        print(
+            f"No changelog file was added in the correct directories "
+            f"for PR {pr_num}."
+        )
         sys.exit(1)
 
-    if not check_changelog_type(types, matching_file):
-        print(f'The changelog file that was added for PR {pr_num} is not '
-              f'one of the configured types: {types}')
-        sys.exit(1)
+    valid = validate_cl_candidates(
+        cl_condidates, pr_num=pr_num, types=list(config["types"])
+    )
 
-    # TODO: Make this a regex to check that the number is in the right place etc.
-    if (cl_config.get('verify_pr_number', False) and
-            str(pr_num) not in matching_file):
-        print(f'The number in the changelog file ({matching_file}) does not '
-              f'match this pull request number ({pr_num}).')
+    if not valid:
+        print(f"Some change log files are incorrect.  See report above.")
         sys.exit(1)
 
     # Success!
-    print(f'Changelog file ({matching_file}) correctly added for PR {pr_num}.')
+    print(f"Change log file(s) detected for PR {pr_num} and all are valid.")
 
 
 if __name__ == "__main__":
