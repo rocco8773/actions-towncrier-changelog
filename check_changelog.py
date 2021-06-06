@@ -49,14 +49,14 @@ def parse_toml(config):
     return {
         "package": config.get("package", ""),
         "package_dir": config.get("package_dir", "."),
-        "directory": config.get("directory"),
+        "directory": config.get("directory", None),
         "sections": sections,
         "types": types,
     }
 
 
 def calculate_fragment_paths(config):
-    if config.get("directory"):
+    if config.get("directory") is not None:
         base_directory = config["directory"]
         fragment_directory = None
     else:
