@@ -7,7 +7,7 @@ import toml
 from collections import OrderedDict
 from github import Github
 from pathlib import Path
-
+from typing import Any, Dict, List
 
 _template_fname = "towncrier:default"
 _default_types = OrderedDict([
@@ -20,7 +20,7 @@ _default_types = OrderedDict([
 
 # This was from towncrier._settings before they changed the API to be too
 # painful.
-def parse_toml(config):
+def parse_toml(config) -> Dict[str, Any]:
     """
     Examine the pyproject.toml and extract the necessary configuration values
     for checking for change log entries.
@@ -96,6 +96,46 @@ def check_changelog_type(types, matching_file):
     return components[1] in types
 
 
+def collect_possible_changelog_files(
+    pr_files: List[str], config: Dict[str, Any]
+) -> List[str]:
+    """
+    Scan through the ``pr_files``, which should be the files modified by the
+    PR, and collect those that are found in the `towncrier`
+    changelog/newsfragment directory.
+    """
+    possible_cl_files = []
+
+    section_dirs = list(config["section"].values())
+
+    if config["directory"] is not None:
+        cl_base_dir = config["directory"]
+    else:
+        # fallback to towncrier default
+        cl_base_dir = os.path.join(
+            config['package_dir'], config['package'], "newsfragments"
+        )
+
+    for filename in pr_files:
+        if not filename.endswith(".rst"):
+            continue
+
+        if not filename.startswith(cl_base_dir):
+            continue
+
+        filename = filename.lstrip(cl_base_dir).lstrip("/")
+
+        for sdir in section_dirs:
+            if filename.startswith(sdir):
+                filename.lstrip(sdir).lstrip("/")
+                continue
+
+        if filename != "":
+            possible_cl_files.append(filename)
+
+    return possible_cl_files
+
+
 def run():
     """Function to run when action is run."""
     event_name = os.environ['GITHUB_EVENT_NAME']
@@ -147,8 +187,11 @@ def run():
     pr_num = event['number']
     pr = base_repo.get_pull(pr_num)
     pr_modified_files = [f.filename for f in pr.get_files()]
+    cl_condidates = collect_possible_changelog_files(pr_modified_files, config)
 
-    print(f"PR Files include {pr_modified_files}")
+    print(
+        f"PR Files include {pr_modified_files}\n\n"
+        f"Number of Possible Change Log Files = {len(cl_condidates)}")
 
     section_dirs = calculate_fragment_paths(config)
     types = config['types'].keys()
