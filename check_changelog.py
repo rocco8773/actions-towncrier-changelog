@@ -199,7 +199,6 @@ def validate_cl_candidates(filenames: List[str], pr_num, types) -> bool:
             continue
 
         parts = parse_newfragment_basename(filename, types)
-        print(f"{filename} and {parts}")
 
         if parts == (None, None, None) or int(parts[0]) != pr_num:
             valid = False
