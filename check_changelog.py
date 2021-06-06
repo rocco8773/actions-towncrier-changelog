@@ -5,53 +5,9 @@ import sys
 from collections import OrderedDict
 from pathlib import Path
 
-import pkg_resources
 from github import Github
 from toml import loads
 
-event_name = os.environ['GITHUB_EVENT_NAME']
-if not event_name.startswith('pull_request'):
-    print(f'No-op for {event_name}')
-    sys.exit(0)
-
-event_jsonfile = os.environ['GITHUB_EVENT_PATH']
-
-with open(event_jsonfile, encoding='utf-8') as fin:
-    event = json.load(fin)
-
-bot_username = os.environ.get('BOT_USERNAME', 'astropy-bot')
-basereponame = event['pull_request']['base']['repo']['full_name']
-g = Github(os.environ.get('GITHUB_TOKEN'))
-
-# Grab config from upstream's default branch
-print(f'Bot username: {bot_username}')
-print(f'Base repository: {basereponame}')
-print()
-baserepo = g.get_repo(basereponame)
-pyproject_toml = baserepo.get_contents('pyproject.toml')
-toml_cfg = loads(pyproject_toml.decoded_content.decode('utf-8'))
-
-try:
-    cl_config = toml_cfg['tool'][bot_username]['towncrier_changelog']
-except KeyError:
-    print(f'Missing [tool.{bot_username}.towncrier_changelog] section.')
-    sys.exit(1)
-
-if not cl_config.get('enabled', False):
-    print(f"cl_config = {cl_config}")
-    print('Skipping towncrier changelog plugin as disabled in config')
-    sys.exit(0)
-
-skip_label = cl_config.get('changelog_skip_label', None)
-pr_labels = [e['name'] for e in event['pull_request']['labels']]
-
-print(f'PR labels: {pr_labels}')
-print()
-
-if skip_label and skip_label in pr_labels:
-    print(f'Skipping towncrier changelog plugin because "{skip_label}" '
-          'label is set')
-    sys.exit(0)
 
 _start_string = u".. towncrier release notes start\n"
 _title_format = None
@@ -112,20 +68,6 @@ def parse_toml(config):
             failing_option="all_bullets",
         )
 
-    # template = config.get("template", _template_fname)
-    # if template.startswith("towncrier:"):
-    #     resource_name = "templates/" + template.split(
-    #         "towncrier:", 1)[1] + ".rst"
-    #     if not pkg_resources.resource_exists("towncrier", resource_name):
-    #         raise KeyError(
-    #             "Towncrier does not have a template named '%s'."
-    #             % (template.split("towncrier:", 1)[1],)
-    #         )
-    #
-    #     template = pkg_resources.resource_filename("towncrier", resource_name)
-    # else:
-    #     template = template
-
     return {
         "package": config.get("package", ""),
         "package_dir": config.get("package_dir", "."),
@@ -136,7 +78,6 @@ def parse_toml(config):
         "name": config.get("name"),
         "sections": sections,
         "types": types,
-        # "template": template,
         "start_string": config.get("start_string", _start_string),
         "title_format": config.get("title_format", _title_format),
         "issue_format": config.get("issue_format"),
@@ -181,38 +122,85 @@ def check_sections(filenames, sections):
     return False
 
 
-config = parse_toml(toml_cfg)
-pr_num = event['number']
-pr = baserepo.get_pull(pr_num)
-modified_files = [f.filename for f in pr.get_files()]
-section_dirs = calculate_fragment_paths(config)
-types = config['types'].keys()
-matching_file = check_sections(modified_files, section_dirs)
-
-if not matching_file:
-    print('No changelog file was added in the correct directories for '
-          f'PR {pr_num}')
-    sys.exit(1)
-
-
 def check_changelog_type(types, matching_file):
     filename = Path(matching_file).name
     components = filename.split(".")
     return components[1] in types
 
 
-if not check_changelog_type(types, matching_file):
-    print(f'The changelog file that was added for PR {pr_num} is not '
-          f'one of the configured types: {types}')
-    sys.exit(1)
+def run():
+    event_name = os.environ['GITHUB_EVENT_NAME']
+    if not event_name.startswith('pull_request'):
+        print(f'No-op for {event_name}')
+        sys.exit(0)
+
+    event_jsonfile = os.environ['GITHUB_EVENT_PATH']
+
+    with open(event_jsonfile, encoding='utf-8') as fin:
+        event = json.load(fin)
+
+    bot_username = os.environ.get('BOT_USERNAME', 'astropy-bot')
+    basereponame = event['pull_request']['base']['repo']['full_name']
+    g = Github(os.environ.get('GITHUB_TOKEN'))
+
+    # Grab config from upstream's default branch
+    print(f'Bot username: {bot_username}')
+    print(f'Base repository: {basereponame}')
+    print()
+    baserepo = g.get_repo(basereponame)
+    pyproject_toml = baserepo.get_contents('pyproject.toml')
+    toml_cfg = loads(pyproject_toml.decoded_content.decode('utf-8'))
+
+    try:
+        cl_config = toml_cfg['tool'][bot_username]['towncrier_changelog']
+    except KeyError:
+        print(f'Missing [tool.{bot_username}.towncrier_changelog] section.')
+        sys.exit(1)
+
+    if not cl_config.get('enabled', False):
+        print(f"cl_config = {cl_config}")
+        print('Skipping towncrier changelog plugin as disabled in config')
+        sys.exit(0)
+
+    skip_label = cl_config.get('changelog_skip_label', None)
+    pr_labels = [e['name'] for e in event['pull_request']['labels']]
+
+    print(f'PR labels: {pr_labels}')
+    print()
+
+    if skip_label and skip_label in pr_labels:
+        print(f'Skipping towncrier changelog plugin because "{skip_label}" '
+              'label is set')
+        sys.exit(0)
+
+    config = parse_toml(toml_cfg)
+    pr_num = event['number']
+    pr = baserepo.get_pull(pr_num)
+    modified_files = [f.filename for f in pr.get_files()]
+    section_dirs = calculate_fragment_paths(config)
+    types = config['types'].keys()
+    matching_file = check_sections(modified_files, section_dirs)
+
+    if not matching_file:
+        print('No changelog file was added in the correct directories for '
+              f'PR {pr_num}')
+        sys.exit(1)
+
+    if not check_changelog_type(types, matching_file):
+        print(f'The changelog file that was added for PR {pr_num} is not '
+              f'one of the configured types: {types}')
+        sys.exit(1)
+
+    # TODO: Make this a regex to check that the number is in the right place etc.
+    if (cl_config.get('verify_pr_number', False) and
+            str(pr_num) not in matching_file):
+        print(f'The number in the changelog file ({matching_file}) does not '
+              f'match this pull request number ({pr_num}).')
+        sys.exit(1)
+
+    # Success!
+    print(f'Changelog file ({matching_file}) correctly added for PR {pr_num}.')
 
 
-# TODO: Make this a regex to check that the number is in the right place etc.
-if (cl_config.get('verify_pr_number', False) and
-        str(pr_num) not in matching_file):
-    print(f'The number in the changelog file ({matching_file}) does not '
-          f'match this pull request number ({pr_num}).')
-    sys.exit(1)
-
-# Success!
-print(f'Changelog file ({matching_file}) correctly added for PR {pr_num}.')
+if __name__ == "__main__":
+    run()
