@@ -142,6 +142,13 @@ def validate_cl_candidates(filenames: List[str], pr_num, types) -> bool:
             return invalid
 
     valid = True
+    if len(filenames) == 0:
+        valid = False
+        print(
+            f"No changelog files was added in the correct directories "
+            f"for PR {pr_num}."
+        )
+
     for filename in filenames:
         if os.path.dirname(filename) != "":
             valid = False
@@ -208,8 +215,12 @@ def run():
         sys.exit(1)
 
     if not cl_config.get('enabled', False):
-        print(f"cl_config = {cl_config}")
-        print('Skipping towncrier changelog plugin as disabled in config')
+        print(
+            f"Skipping towncrier changelog plugin as disabled in config"
+            f" (i.e. 'enabled = false' for the"
+            f" [tool.{bot_username}.towncrier_changelog] in the"
+            f" pyproject.toml on the base, not the PR branch)."
+        )
         sys.exit(0)
 
     pr_labels = [e['name'] for e in event['pull_request']['labels']]
@@ -218,7 +229,7 @@ def run():
     skip_label = cl_config.get('changelog_skip_label', None)
     if skip_label and skip_label in pr_labels:
         print(f'Skipping towncrier changelog plugin because "{skip_label}" '
-              'label is set')
+              'label is set.')
         sys.exit(0)
 
     config = parse_toml(toml_cfg)
@@ -226,16 +237,7 @@ def run():
     pr = base_repo.get_pull(pr_num)
     pr_modified_files = [f.filename for f in pr.get_files()]
 
-    print(f"PR Files include {pr_modified_files}\n\n")
-
     cl_condidates = collect_possible_changelog_files(pr_modified_files, config)
-    if len(cl_condidates) == 0:
-        print(
-            f"No changelog file was added in the correct directories "
-            f"for PR {pr_num}."
-        )
-        sys.exit(1)
-
     valid = validate_cl_candidates(
         cl_condidates, pr_num=pr_num, types=list(config["types"])
     )
