@@ -276,11 +276,6 @@ def run():
     pr = base_repo.get_pull(pr_num)
     pr_modified_files = [f.filename for f in pr.get_files()]
 
-    print(f"Files modified by PR {pr_num}")
-    for filename in pr_modified_files:
-        print(f"    {filename}")
-    print("")
-
     cl_condidates = collect_possible_changelog_files(pr_modified_files, config)
     print(
         f"PR num = {pr_num}\n"
