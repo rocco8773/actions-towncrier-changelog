@@ -105,6 +105,9 @@ def collect_possible_changelog_files(
         if not filename.endswith(".rst"):
             continue
 
+        if filename == "README.rst":
+            continue
+
         # if not filename.startswith(cl_base_dir):
         #     continue
         #
